@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: apkplayer
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: APPETIZE_API_TOKEN
+        sync: false
