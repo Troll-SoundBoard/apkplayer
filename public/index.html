@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>APK Player</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, sans-serif; background:#0f1115; color:#e8eaed; min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:24px; gap:20px; }
+  h1 { margin:0; font-size:1.6rem; }
+  .card { background:#181b22; border:1px solid #2a2f3a; border-radius:14px; padding:20px; width:100%; max-width:520px; text-align:center; }
+  .drop { border:2px dashed #3a4150; border-radius:12px; padding:36px 16px; cursor:pointer; transition:.15s; }
+  .drop.over { border-color:#6ea8fe; background:#1c2230; }
+  button, select { background:#2f6bff; color:#fff; border:0; border-radius:8px; padding:10px 16px; font-size:1rem; cursor:pointer; }
+  select { background:#232833; border:1px solid #3a4150; }
+  #status { margin-top:12px; min-height:1.2em; color:#9aa4b5; }
+  #status.err { color:#ff7b7b; }
+  #player { width:100%; display:none; flex-direction:column; align-items:center; gap:12px; }
+  iframe { border:0; border-radius:12px; background:#000; width:100%; max-width:420px; height:min(86vh, 860px); }
+  .row { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:14px; }
+</style>
+</head>
+<body>
+  <h1>APK Player</h1>
+  <div class="card" id="uploader">
+    <div class="drop" id="drop">Drop an .apk here or click to choose</div>
+    <input type="file" id="file" accept=".apk" hidden>
+    <div class="row">
+      <select id="device">
+        <option value="pixel7">Pixel 7</option>
+        <option value="pixel4">Pixel 4</option>
+        <option value="galaxys22">Galaxy S22</option>
+        <option value="nexus5">Nexus 5</option>
+      </select>
+      <button id="go" disabled>Run</button>
+    </div>
+    <div id="status"></div>
+  </div>
+  <div id="player">
+    <iframe id="frame" allow="autoplay; clipboard-write; microphone; camera"></iframe>
+    <button id="again">Run another APK</button>
+  </div>
+
+<script>
+const $ = id => document.getElementById(id);
+let file = null;
+const status = (t, err) => { $("status").textContent = t; $("status").className = err ? "err" : ""; };
+const pick = f => { if (!f) return; file = f; $("drop").textContent = f.name + " (" + (f.size/1048576).toFixed(1) + " MB)"; $("go").disabled = false; status(""); };
+
+$("drop").onclick = () => $("file").click();
+$("file").onchange = e => pick(e.target.files[0]);
+$("drop").ondragover = e => { e.preventDefault(); $("drop").classList.add("over"); };
+$("drop").ondragleave = () => $("drop").classList.remove("over");
+$("drop").ondrop = e => { e.preventDefault(); $("drop").classList.remove("over"); pick(e.dataTransfer.files[0]); };
+
+$("go").onclick = async () => {
+  if (!file) return;
+  $("go").disabled = true; status("Uploading… this can take a minute.");
+  try {
+    const fd = new FormData(); fd.append("apk", file);
+    const r = await fetch("/upload", { method: "POST", body: fd });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Upload failed");
+    const url = "https://appetize.io/embed/" + d.publicKey + "?device=" + $("device").value + "&scale=auto&autoplay=true&orientation=portrait";
+    $("frame").src = url;
+    $("uploader").style.display = "none"; $("player").style.display = "flex";
+  } catch (e) { status(e.message, true); $("go").disabled = false; }
+};
+$("again").onclick = () => { $("frame").src = "about:blank"; $("player").style.display = "none"; $("uploader").style.display = "block"; $("go").disabled = !file; status(""); };
+</script>
+</body>
+</html>
